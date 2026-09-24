@@ -31,8 +31,19 @@ cp .env.example .env
 
 3. Запустите проект через Docker Compose:
 
+**Linux / macOS:**
 ```bash
 docker compose up --build
+```
+
+**Windows (PowerShell):**
+```powershell
+.\docker_run.ps1
+```
+
+Для запуска в фоновом режиме (Windows):
+```powershell
+.\docker_run.ps1 -Detached
 ```
 
 4. Откройте в браузере:
