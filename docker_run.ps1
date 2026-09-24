@@ -1,130 +1,156 @@
-#!/usr/bin/env pwsh
+﻿#Requires -Version 3.0
 <#
 .SYNOPSIS
-    Запуск Docker Compose демонстрационного приложения Wiren API
+    Runs Wiren API Demo in Docker containers.
 
 .DESCRIPTION
-    Скрипт проверяет наличие Docker, создаёт .env файл при необходимости,
-    и запускает приложение через docker compose up --build
+    This script checks Docker and docker compose availability,
+    prepares .env file, and starts the application containers.
 
 .PARAMETER Detached
-    Запустить контейнеры в фоновом режиме (detached mode)
+    Run containers in detached mode (background).
 
 .EXAMPLE
     .\docker_run.ps1
-    Запуск в обычном режиме с выводом логов
+    Runs containers in foreground mode.
 
 .EXAMPLE
     .\docker_run.ps1 -Detached
-    Запуск в фоновом режиме
+    Runs containers in detached mode.
 #>
 
 [CmdletBinding()]
 param(
+    [Parameter()]
     [Alias("d")]
     [switch]$Detached
 )
 
-# Установка кодировки UTF-8 для корректного вывода
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
 
-# Переход в директорию скрипта
-$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-Set-Location $ScriptDir
+# Colors for output
+$ColorInfo = "Cyan"
+$ColorSuccess = "Green"
+$ColorWarning = "Yellow"
+$ColorError = "Red"
 
-Write-Host "🚀 Запуск Wiren API Demo..." -ForegroundColor Cyan
-Write-Host ""
+# Helper function to write colored output
+function Write-ColorOutput {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Message,
+        
+        [Parameter(Mandatory=$false)]
+        [string]$Color = "White"
+    )
+    Write-Host $Message -ForegroundColor $Color
+}
 
-# Проверка наличия Docker
-Write-Host "Проверка Docker..." -ForegroundColor Yellow
-try {
-    $dockerVersion = docker --version 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        throw "Docker не найден"
+# Check if Docker is available
+function Test-DockerAvailable {
+    try {
+        $null = docker --version 2>&1
+        return $true
     }
-    Write-Host "✓ Docker найден: $dockerVersion" -ForegroundColor Green
-} catch {
-    Write-Host "❌ ОШИБКА: Docker не установлен или не доступен" -ForegroundColor Red
-    Write-Host ""
-    Write-Host "Пожалуйста, установите Docker Desktop:" -ForegroundColor Yellow
-    Write-Host "  https://www.docker.com/products/docker-desktop/" -ForegroundColor Cyan
-    Write-Host ""
-    Write-Host "ERROR: Docker is not installed or not available" -ForegroundColor Red
-    Write-Host "Please install Docker Desktop from the link above." -ForegroundColor Yellow
+    catch {
+        return $false
+    }
+}
+
+# Check if docker compose is available
+function Test-DockerComposeAvailable {
+    try {
+        $null = docker compose version 2>&1
+        return $true
+    }
+    catch {
+        return $false
+    }
+}
+
+# Main script execution
+try {
+    Write-ColorOutput "`n========================================" $ColorInfo
+    Write-ColorOutput "  Wiren API Demo - Docker Startup" $ColorInfo
+    Write-ColorOutput "========================================`n" $ColorInfo
+
+    # Check Docker
+    Write-ColorOutput "[1/4] Checking Docker..." $ColorInfo
+    if (-not (Test-DockerAvailable)) {
+        Write-ColorOutput "ERROR: Docker is not installed or not running." $ColorError
+        Write-ColorOutput "Install Docker Desktop: https://www.docker.com/products/docker-desktop" $ColorWarning
+        exit 1
+    }
+    Write-ColorOutput "      Docker found" $ColorSuccess
+
+    # Check docker compose
+    Write-ColorOutput "`n[2/4] Checking docker compose..." $ColorInfo
+    if (-not (Test-DockerComposeAvailable)) {
+        Write-ColorOutput "ERROR: docker compose is not available." $ColorError
+        Write-ColorOutput "Update Docker Desktop to the latest version." $ColorWarning
+        exit 1
+    }
+    Write-ColorOutput "      docker compose found" $ColorSuccess
+
+    # Prepare .env file
+    Write-ColorOutput "`n[3/4] Preparing .env file..." $ColorInfo
+    $envFile = Join-Path $PSScriptRoot ".env"
+    $envExampleFile = Join-Path $PSScriptRoot ".env.example"
+
+    if (-not (Test-Path $envFile)) {
+        if (Test-Path $envExampleFile) {
+            Copy-Item $envExampleFile $envFile
+            Write-ColorOutput "      .env created from .env.example" $ColorSuccess
+        }
+        else {
+            Write-ColorOutput "WARNING: .env.example not found." $ColorWarning
+            Write-ColorOutput "Continuing without .env file..." $ColorWarning
+        }
+    }
+    else {
+        Write-ColorOutput "      .env already exists" $ColorSuccess
+    }
+
+    # Start containers
+    Write-ColorOutput "`n[4/4] Starting containers..." $ColorInfo
+    
+    $composeArgs = @("compose", "up", "--build")
+    if ($Detached) {
+        $composeArgs += "-d"
+        Write-ColorOutput "      Mode: background (detached)" $ColorInfo
+    }
+    else {
+        Write-ColorOutput "      Mode: foreground (Ctrl+C to stop)" $ColorInfo
+    }
+
+    Write-ColorOutput ""
+    $process = Start-Process -FilePath "docker" -ArgumentList $composeArgs -NoNewWindow -Wait -PassThru
+    $exitCode = $process.ExitCode
+
+    if ($exitCode -eq 0) {
+        Write-ColorOutput "`n========================================" $ColorSuccess
+        Write-ColorOutput "  Application started successfully!" $ColorSuccess
+        Write-ColorOutput "========================================`n" $ColorSuccess
+        
+        Write-ColorOutput "Available services:" $ColorInfo
+        Write-ColorOutput "  * Client:  http://localhost:3000" $ColorSuccess
+        Write-ColorOutput "  * API:     http://localhost:8080/swagger`n" $ColorSuccess
+        
+        if ($Detached) {
+            Write-ColorOutput "To stop, run:" $ColorInfo
+            Write-ColorOutput "  docker compose down`n" $ColorWarning
+        }
+        
+        exit 0
+    }
+    else {
+        Write-ColorOutput "`nERROR: Container exited with code $exitCode" $ColorError
+        exit $exitCode
+    }
+}
+catch {
+    Write-ColorOutput "`nCRITICAL ERROR: $_" $ColorError
+    Write-ColorOutput $_.ScriptStackTrace $ColorError
     exit 1
 }
-
-# Проверка наличия Docker Compose
-Write-Host "Проверка Docker Compose..." -ForegroundColor Yellow
-try {
-    $composeVersion = docker compose version 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        throw "Docker Compose не найден"
-    }
-    Write-Host "✓ Docker Compose найден: $composeVersion" -ForegroundColor Green
-} catch {
-    Write-Host "❌ ОШИБКА: Docker Compose не доступен" -ForegroundColor Red
-    Write-Host ""
-    Write-Host "Docker Compose должен быть включён в Docker Desktop." -ForegroundColor Yellow
-    Write-Host "Убедитесь, что Docker Desktop запущен." -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "ERROR: Docker Compose is not available" -ForegroundColor Red
-    exit 1
-}
-
-Write-Host ""
-
-# Проверка и создание .env файла
-$envFile = Join-Path $ScriptDir ".env"
-$envExampleFile = Join-Path $ScriptDir ".env.example"
-
-if (-not (Test-Path $envFile)) {
-    if (Test-Path $envExampleFile) {
-        Write-Host "📝 Файл .env не найден. Копирование из .env.example..." -ForegroundColor Yellow
-        Copy-Item $envExampleFile $envFile
-        Write-Host "✓ Файл .env создан из .env.example" -ForegroundColor Green
-        Write-Host ""
-    } else {
-        Write-Host "⚠️  Предупреждение: Файлы .env и .env.example не найдены" -ForegroundColor Yellow
-        Write-Host "   Приложение будет использовать значения по умолчанию" -ForegroundColor Yellow
-        Write-Host ""
-    }
-} else {
-    Write-Host "✓ Файл .env найден" -ForegroundColor Green
-    Write-Host ""
-}
-
-# Запуск Docker Compose
-Write-Host "🐳 Запуск Docker Compose..." -ForegroundColor Cyan
-Write-Host ""
-
-if ($Detached) {
-    Write-Host "Режим: Фоновый (detached)" -ForegroundColor Yellow
-    docker compose up --build -d
-} else {
-    Write-Host "Режим: С выводом логов (нажмите Ctrl+C для остановки)" -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "Приложение будет доступно по адресам:" -ForegroundColor Green
-    Write-Host "  • Клиент:  http://localhost:3000" -ForegroundColor Cyan
-    Write-Host "  • Swagger: http://localhost:8080/swagger" -ForegroundColor Cyan
-    Write-Host ""
-    Write-Host "─────────────────────────────────────────────────────" -ForegroundColor DarkGray
-    Write-Host ""
-    docker compose up --build
-}
-
-# Если запущено в фоновом режиме, вывести информацию после запуска
-if ($Detached -and $LASTEXITCODE -eq 0) {
-    Write-Host ""
-    Write-Host "✓ Контейнеры успешно запущены в фоновом режиме" -ForegroundColor Green
-    Write-Host ""
-    Write-Host "Приложение доступно по адресам:" -ForegroundColor Green
-    Write-Host "  • Клиент:  http://localhost:3000" -ForegroundColor Cyan
-    Write-Host "  • Swagger: http://localhost:8080/swagger" -ForegroundColor Cyan
-    Write-Host ""
-    Write-Host "Для просмотра логов: docker compose logs -f" -ForegroundColor Yellow
-    Write-Host "Для остановки:       docker compose down" -ForegroundColor Yellow
-    Write-Host ""
-}
-
-exit $LASTEXITCODE
