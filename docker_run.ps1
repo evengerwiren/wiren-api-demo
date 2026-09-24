@@ -76,52 +76,52 @@ try {
     Write-ColorOutput "========================================`n" $ColorInfo
 
     # Check Docker
-    Write-ColorOutput "[1/4] Proverka Docker..." $ColorInfo
+    Write-ColorOutput "[1/4] Checking Docker..." $ColorInfo
     if (-not (Test-DockerAvailable)) {
-        Write-ColorOutput "OSHIBKA: Docker ne ustanovlen ili ne zapushchen." $ColorError
-        Write-ColorOutput "Ustanovite Docker Desktop: https://www.docker.com/products/docker-desktop" $ColorWarning
+        Write-ColorOutput "ERROR: Docker is not installed or not running." $ColorError
+        Write-ColorOutput "Install Docker Desktop: https://www.docker.com/products/docker-desktop" $ColorWarning
         exit 1
     }
-    Write-ColorOutput "      Docker nayden" $ColorSuccess
+    Write-ColorOutput "      Docker found" $ColorSuccess
 
     # Check docker compose
-    Write-ColorOutput "`n[2/4] Proverka docker compose..." $ColorInfo
+    Write-ColorOutput "`n[2/4] Checking docker compose..." $ColorInfo
     if (-not (Test-DockerComposeAvailable)) {
-        Write-ColorOutput "OSHIBKA: docker compose ne dostupna." $ColorError
-        Write-ColorOutput "Obnovite Docker Desktop do posledney versii." $ColorWarning
+        Write-ColorOutput "ERROR: docker compose is not available." $ColorError
+        Write-ColorOutput "Update Docker Desktop to the latest version." $ColorWarning
         exit 1
     }
-    Write-ColorOutput "      docker compose nayden" $ColorSuccess
+    Write-ColorOutput "      docker compose found" $ColorSuccess
 
     # Prepare .env file
-    Write-ColorOutput "`n[3/4] Podgotovka .env fayla..." $ColorInfo
+    Write-ColorOutput "`n[3/4] Preparing .env file..." $ColorInfo
     $envFile = Join-Path $PSScriptRoot ".env"
     $envExampleFile = Join-Path $PSScriptRoot ".env.example"
 
     if (-not (Test-Path $envFile)) {
         if (Test-Path $envExampleFile) {
             Copy-Item $envExampleFile $envFile
-            Write-ColorOutput "      .env sozdana iz .env.example" $ColorSuccess
+            Write-ColorOutput "      .env created from .env.example" $ColorSuccess
         }
         else {
-            Write-ColorOutput "PREDUPREZHDENIE: .env.example ne nayden." $ColorWarning
-            Write-ColorOutput "Prodolzhayu bez .env fayla..." $ColorWarning
+            Write-ColorOutput "WARNING: .env.example not found." $ColorWarning
+            Write-ColorOutput "Continuing without .env file..." $ColorWarning
         }
     }
     else {
-        Write-ColorOutput "      .env uzhe sushchestvuet" $ColorSuccess
+        Write-ColorOutput "      .env already exists" $ColorSuccess
     }
 
     # Start containers
-    Write-ColorOutput "`n[4/4] Zapusk konteynerov..." $ColorInfo
+    Write-ColorOutput "`n[4/4] Starting containers..." $ColorInfo
     
     $composeArgs = @("compose", "up", "--build")
     if ($Detached) {
         $composeArgs += "-d"
-        Write-ColorOutput "      Rezhim: fon (detached)" $ColorInfo
+        Write-ColorOutput "      Mode: background (detached)" $ColorInfo
     }
     else {
-        Write-ColorOutput "      Rezhim: peredny plan (Ctrl+C dlya ostanovki)" $ColorInfo
+        Write-ColorOutput "      Mode: foreground (Ctrl+C to stop)" $ColorInfo
     }
 
     Write-ColorOutput ""
@@ -130,27 +130,27 @@ try {
 
     if ($exitCode -eq 0) {
         Write-ColorOutput "`n========================================" $ColorSuccess
-        Write-ColorOutput "  Prilozhenie zapushcheno uspeshno!" $ColorSuccess
+        Write-ColorOutput "  Application started successfully!" $ColorSuccess
         Write-ColorOutput "========================================`n" $ColorSuccess
         
-        Write-ColorOutput "Dostupnye servisy:" $ColorInfo
-        Write-ColorOutput "  * Klient:  http://localhost:3000" $ColorSuccess
+        Write-ColorOutput "Available services:" $ColorInfo
+        Write-ColorOutput "  * Client:  http://localhost:3000" $ColorSuccess
         Write-ColorOutput "  * API:     http://localhost:8080/swagger`n" $ColorSuccess
         
         if ($Detached) {
-            Write-ColorOutput "Dlya ostanovki vypolnite:" $ColorInfo
+            Write-ColorOutput "To stop, run:" $ColorInfo
             Write-ColorOutput "  docker compose down`n" $ColorWarning
         }
         
         exit 0
     }
     else {
-        Write-ColorOutput "`nOSHIBKA: Konteyner zavershen s kodom $exitCode" $ColorError
+        Write-ColorOutput "`nERROR: Container exited with code $exitCode" $ColorError
         exit $exitCode
     }
 }
 catch {
-    Write-ColorOutput "`nKRITIChESKAYa OShIBKA: $_" $ColorError
+    Write-ColorOutput "`nCRITICAL ERROR: $_" $ColorError
     Write-ColorOutput $_.ScriptStackTrace $ColorError
     exit 1
 }
