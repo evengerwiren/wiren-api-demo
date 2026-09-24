@@ -38,8 +38,9 @@ $ColorError = "Red"
 # Helper function to write colored output
 function Write-ColorOutput {
     param(
-        [Parameter(Mandatory=$true)]
-        [string]$Message,
+        [Parameter(Mandatory=$false)]
+        [AllowEmptyString()]
+        [string]$Message = "",
         
         [Parameter(Mandatory=$false)]
         [string]$Color = "White"
@@ -151,6 +152,8 @@ try {
 }
 catch {
     Write-ColorOutput "`nCRITICAL ERROR: $_" $ColorError
-    Write-ColorOutput $_.ScriptStackTrace $ColorError
+    if ($_.ScriptStackTrace) {
+        Write-ColorOutput $_.ScriptStackTrace $ColorError
+    }
     exit 1
 }
